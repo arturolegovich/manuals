@@ -1,0 +1,124 @@
+Подробная иснтрукция по установке TeamPass на Debian 10 на примере сайта teampass-imz-2.phpchain.ru
+
+1. Скачать Debian 10 buster (именно 10, а не 11, это важно!) или выбираем шаблон ВМ, в случае использования VPS:
+https://cdimage.debian.org/cdimage/archive/10.11.0/amd64/iso-dvd/debian-10.11.0-amd64-DVD-1.iso
+
+2. Обновляем систему, делаем это от имени обычного пользователя состоящего в группе sudo:
+sudo apt update && sudo apt full-upgrade -y
+
+3. Устанавливаем nginx, php-fpm:
+sudo wget https://packages.sury.org/php/apt.gpg && sudo apt-key add apt.gpg && sudo rm -rf apt.gpg && \
+	sudo echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/php7.list && \
+	sudo apt update && \
+	sudo apt install nginx php7.3-fpm php7.3-mysql php7.3-xml php7.3-mbstring php7.3-bcmath php7.3-curl php7.3-gd php7.3-common php7.3-ldap -y && \
+	sudo sed -i "s|;*max_execution_time\s*=.*|max_execution_time = 60|i" /etc/php/7.3/fpm/php.ini && \
+	sudo sed -i "s|;*memory_limit\s*=.*|memory_limit = 64M|i" /etc/php/7.3/fpm/php.ini && \
+	sudo systemctl restart php7.3-fpm
+
+4. Установим git для загрузки teampass:
+sudo apt install git -y
+
+5. Настроим часовой пояс на Europe/Samara:
+sudo dpkg-reconfigure tzdata
+
+6. Установим MC для удобства работы:
+sudo apt install mc -y
+
+7. Установим СУБД PerconaDB:
+sudo apt install gnupg2 -y && sudo wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && \
+	sudo rm -rf percona-release_latest.$(lsb_release -sc)_all.deb && \
+	sudo dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb && \
+	sudo apt update && \
+	sudo apt install percona-server-server-5.7 -y
+
+8. В /etc/mysql/mysql.cnf дописываем ниже (делать от root - sudo mc и далее):
+[mysqld]
+character-set-server=utf8
+collation-server=utf8_general_ci
+
+# Security
+tls_version=TLSv1.2
+
+# INNODB Settings
+innodb_buffer_pool_size = 8M
+
+9. Скачаем и установим в каталог /opt teampass:
+cd /opt && sudo git clone https://github.com/arturolegovich/TeamPass-2.1.27.36 && sudo chown -R www-data:www-data TeamPass-2.1.27.36 && \
+	sudo mkdir /etc/teampass2 && \
+	sudo chown -R www-data:www-data /etc/teampass2
+
+10. Скачаем и установим в каталог /opt PHPMyAdmin:
+cd /opt && sudo wget https://files.phpmyadmin.net/phpMyAdmin/5.1.1/phpMyAdmin-5.1.1-all-languages.zip && \
+	sudo unzip phpMyAdmin-5.1.1-all-languages.zip && \
+	sudo rm -f phpMyAdmin-5.1.1-all-languages.zip
+
+11. Настраиваем nginx на работу по доменному имени teampass-imz-2.phpchain.ru (20.106.240.247):
+11.1. Создаем файл /etc/nginx/sites-available/teampass-imz-2.phpchain.ru со следующим содержимым:
+##
+# You should look at the following URL's in order to grasp a solid understanding
+# of Nginx configuration files in order to fully unleash the power of Nginx.
+# https://www.nginx.com/resources/wiki/start/
+# https://www.nginx.com/resources/wiki/start/topics/tutorials/config_pitfalls/
+# https://wiki.debian.org/Nginx/DirectoryStructure
+#
+# In most cases, administrators will remove this file from sites-enabled/ and
+# leave it as reference inside of sites-available where it will continue to be
+# updated by the nginx packaging team.
+#
+# This file will automatically load configuration files provided by other
+# applications, such as Drupal or Wordpress. These applications will be made
+# available underneath a path with that package name, such as /drupal8.
+#
+# Please see /usr/share/doc/nginx-doc/examples/ for more detailed examples.
+##
+
+# Virtual Host configuration for teampass-imz-2.phpchain.ru
+#
+# You can move that to a different file under sites-available/ and symlink that
+# to sites-enabled/ to enable it.
+#
+server {
+        listen 80;
+        server_name teampass-imz-2.phpchain.ru;
+        root /opt/TeamPass-2.1.27.36;
+        index index.php;
+        location / {
+                try_files $uri $uri/ =404;
+        }
+        location ~ \.php$ {
+                include snippets/fastcgi-php.conf;
+                fastcgi_pass unix:/var/run/php/php7.3-fpm.sock;
+        }
+        # PHPMyAdmin Settings
+        location /pma {
+                alias /opt/phpMyAdmin-5.1.1-all-languages;
+                location ~ \.php$ {
+                        fastcgi_pass unix:/var/run/php/php7.3-fpm.sock;
+                        fastcgi_index index.php;
+                        fastcgi_param SCRIPT_FILENAME $request_filename;
+                        include fastcgi_params;
+                        fastcgi_ignore_client_abort off;
+                }
+                location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+                        access_log    off;
+                        log_not_found    off;
+                        expires 1M;
+                }
+        }
+}
+
+11.2. Создаём символическую ссылку в каталоге /etc/nginx/sites-enabled:
+sudo ln -s /etc/nginx/sites-available/teampass-imz-2.phpchain.ru /etc/nginx/sites-enabled/teampass-imz-2.phpchain.ru
+
+11.3. Применяем настройки nginx без перезагрузки nginx:
+sudo systemctl reload nginx
+
+12. Создадим пользователя teampass2, базу данных для teampass2 и предоставим полные права доступа пользователю teampass2 
+с помощью PHPMyAdmin по ссылке:
+teampass-imz-2.phpchain.ru/pma
+
+13. sudo apt full-upgrade -y
+
+14. Переходим по адресу teampass-imz-2.phpchain.ru и приступаем к настройке teampass.
+Когда речь пойдёт о salt-key path указываем /etc/teampass2.
+Логин и пароль к БД те, что придумали сами.
