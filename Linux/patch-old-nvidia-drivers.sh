@@ -9,7 +9,6 @@
 # Currently this works with NVIDIA 340.108 / 390.144 / 418.113 / 435.21 drivers and
 # latest 5.14, 5.13, 5.12, 5.11, 5.10 and 5.9 kernels.
 
-```
 apt install wget patch -y
 cd /home
 mkdir nvidia
@@ -19,4 +18,3 @@ chmod +x inttf-nvidia-patcher.sh
 # script usage: inttf-nvidia-patcher.sh [-h] [-v 340.108, 390.144, 418.113 or 435.21]
 ./inttf-nvidia-patcher.sh -v 340.108
 bash NVIDIA-Linux-x86_64-340.108-patched-kernel-5.14.run
-```
