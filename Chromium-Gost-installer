@@ -1,0 +1,6 @@
+##Chromium-Gost
+
+Установка в "C:\Program Files" для всех пользователей:
+```
+c:\chromium-gost-96.0.4664.110-windows-amd64-installer.exe --system-level
+```
